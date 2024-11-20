@@ -47,4 +47,46 @@ router.post("/:id/gererPaiements/:paiementId", async (req, res) => {
   }
 });
 
+// Ajouter un nouveau gestionnaire (sans hachage du mot de passe)
+router.post("/add", async (req, res) => {
+  const { nom, email, motDePasse } = req.body;
+
+  // Validation des champs requis
+  if (!nom || !email || !motDePasse) {
+    return res.status(400).json({ message: "Tous les champs sont requis" });
+  }
+
+  try {
+    // Vérifier si un gestionnaire existe déjà avec cet email
+    const existingGestionnaire = await Gestionnaire.findOne({ email });
+    if (existingGestionnaire) {
+      return res.status(400).json({ message: "Email déjà utilisé" });
+    }
+
+    // Créer un nouveau gestionnaire sans hachage du mot de passe
+    const newGestionnaire = new Gestionnaire({
+      nom,
+      email,
+      motDePasse, // Stockage direct du mot de passe en texte clair
+    });
+
+    // Sauvegarder dans la base de données
+    const savedGestionnaire = await newGestionnaire.save();
+
+    res.status(201).json({
+      message: "Gestionnaire ajouté avec succès",
+      gestionnaire: {
+        id: savedGestionnaire._id,
+        nom: savedGestionnaire.nom,
+        email: savedGestionnaire.email,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+});
+
+
+
+
 module.exports = router;

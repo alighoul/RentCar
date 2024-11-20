@@ -83,4 +83,45 @@ router.delete("/delete/:id", async (req, res) => {
   }
 });
 
+// In your vehiculeRoutes.js, adjust the endpoint for filtering
+
+router.get("/available", async (req, res) => {
+  try {
+    const { marque, modele, prixMin, prixMax } = req.query;
+
+    // Build query dynamically based on provided filters
+    const query = {};
+    if (marque) query.marque = marque;
+    if (modele) query.modele = modele;
+    if (prixMin) query.prixJournalier = { $gte: parseFloat(prixMin) };
+    if (prixMax) query.prixJournalier = { $lte: parseFloat(prixMax) };
+
+    const vehicles = await Vehicule.find(query);
+    res.json(vehicles);
+  } catch (error) {
+    console.error("Error fetching vehicles:", error);
+    res.status(500).json({ error: "Error fetching vehicles" });
+  }
+});
+
+// Route to fetch distinct marques
+router.get("/marques", async (req, res) => {
+  try {
+    const marques = await Vehicule.distinct("marque");
+    res.status(200).json(marques);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching marques", error });
+  }
+});
+
+// Route to fetch distinct modeles
+router.get("/modeles", async (req, res) => {
+  try {
+    const modeles = await Vehicule.distinct("modele");
+    res.status(200).json(modeles);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching modeles", error });
+  }
+});
+
 module.exports = router;
