@@ -1,4 +1,3 @@
-// routes/reservationRoutes.js
 const express = require("express");
 const Reservation = require("../models/Reservation");
 const client = require("../models/Client");
@@ -72,6 +71,7 @@ router.get("/total/:id", async (req, res) => {
   }
 });
 
+// Route pour récupérer une réservation spécifique
 router.get("/getReservation/:id", async (req, res) => {
   try {
     const reservation = await Reservation.findById(req.params.id)
@@ -88,17 +88,16 @@ router.get("/getReservation/:id", async (req, res) => {
   }
 });
 
-// Route to check available vehicles within a date range
+// Route pour vérifier les véhicules disponibles dans une plage de dates
 router.post("/available", async (req, res) => {
   const { dateDebut, dateFin } = req.body;
 
   try {
     const reservedVehiculeIds = await Reservation.find({
-      statut: "en cours", // Active reservations only
+      statut: "en cours", // Réservations actives uniquement
       $or: [{ dateDebut: { $lte: dateFin }, dateFin: { $gte: dateDebut } }],
     }).distinct("vehiculeId");
 
-    // Fetch all vehicles not reserved in the date range
     const availableVehicles = await Vehicule.find({
       _id: { $nin: reservedVehiculeIds },
     });
@@ -115,7 +114,6 @@ router.post("/available", async (req, res) => {
 // Route pour obtenir toutes les réservations
 router.get("/all", async (req, res) => {
   try {
-    // Récupérer toutes les réservations et leurs détails associés
     const reservations = await Reservation.find()
       .populate("clientId") // Récupère les informations du client
       .populate("vehiculeId"); // Récupère les informations du véhicule
@@ -133,24 +131,19 @@ router.get("/all", async (req, res) => {
   }
 });
 
-// Route to check available vehicles within a date range
+// Route pour vérifier la disponibilité des véhicules dans une plage de dates
 router.post("/checkDisponibilite", async (req, res) => {
   const { dateDebut, dateFin } = req.body;
 
   try {
-    // Convert the dateDebut and dateFin to Date objects
     const startDate = new Date(dateDebut);
     const endDate = new Date(dateFin);
 
-    // Find vehicles that are already reserved within the date range
     const reservedVehiculeIds = await Reservation.find({
-      statut: "en cours", // Only check active reservations
-      $or: [
-        { dateDebut: { $lte: endDate }, dateFin: { $gte: startDate } }, // Overlapping range
-      ],
+      statut: "en cours",
+      $or: [{ dateDebut: { $lte: endDate }, dateFin: { $gte: startDate } }],
     }).distinct("vehiculeId");
 
-    // Fetch all vehicles not reserved in the date range
     const availableVehicles = await Vehicule.find({
       _id: { $nin: reservedVehiculeIds },
     });
@@ -158,7 +151,42 @@ router.post("/checkDisponibilite", async (req, res) => {
     res.status(200).json(availableVehicles);
   } catch (error) {
     res.status(500).json({
-      message: "Error fetching available vehicles",
+      message: "Erreur lors de la récupération des véhicules disponibles",
+      error: error.message,
+    });
+  }
+});
+
+// Route pour payer une réservation
+router.put("/pay/:id", async (req, res) => {
+  try {
+    const reservation = await Reservation.findById(req.params.id);
+
+    if (!reservation) {
+      return res.status(404).json({ message: "Réservation non trouvée" });
+    }
+
+    // Vérifier si la réservation a déjà été payée
+    if (reservation.statut === "payée") {
+      return res.status(400).json({ message: "Réservation déjà payée" });
+    }
+
+    // Simulation du paiement (remplacez ceci par une logique de paiement réelle)
+    // Par exemple, vous pourriez appeler un service comme Stripe ou PayPal ici
+
+    // Si le paiement est réussi, mettre à jour le statut
+    reservation.statut = "payée";
+
+    // Enregistrer les modifications dans la base de données
+    await reservation.save();
+
+    // Répondre avec succès
+    res
+      .status(200)
+      .json({ message: "Réservation payée avec succès", reservation });
+  } catch (error) {
+    res.status(400).json({
+      message: "Erreur lors du paiement de la réservation",
       error: error.message,
     });
   }

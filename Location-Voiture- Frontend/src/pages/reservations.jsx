@@ -20,49 +20,68 @@ import {
 } from "@mui/material";
 
 const Reservations = () => {
+  const [originalReservations, setOriginalReservations] = useState([]);
   const [reservations, setReservations] = useState([]);
-  const [filteredReservations, setFilteredReservations] = useState([]);
   const [statusFilter, setStatusFilter] = useState("");
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
   const client = JSON.parse(sessionStorage.getItem("client"));
 
+  // Récupération des réservations depuis le serveur
   useEffect(() => {
     const fetchReservations = async () => {
       try {
         const response = await axios.get(
           "http://localhost:3000/reservation/all"
         );
-
         const clientReservations = response.data.filter(
-          (reservation) =>
-            reservation.clientId && reservation.clientId._id === client.id
+          (reservation) => reservation.clientId?._id === client?.id
         );
 
-        setReservations(clientReservations);
-        setFilteredReservations(clientReservations); // Initial set of filtered reservations
+        // Calcul des coûts totaux
+        const updatedReservations = await Promise.all(
+          clientReservations.map(async (reservation) => {
+            const totalCost = await fetchTotalCost(reservation._id);
+            return { ...reservation, total: totalCost };
+          })
+        );
+
+        setOriginalReservations(updatedReservations);
+        setReservations(updatedReservations);
       } catch (error) {
-        console.error("Error fetching reservations:", error);
+        console.error(
+          "Erreur lors de la récupération des réservations :",
+          error
+        );
       }
     };
 
-    if (client) {
-      fetchReservations();
-    }
+    if (client) fetchReservations();
   }, [client]);
 
-  // Fonction pour appliquer les filtres
-  const applyFilters = () => {
-    let filtered = [...reservations]; // Clone des réservations pour ne pas modifier l'état directement
+  // Calculer le coût total d'une réservation
+  const fetchTotalCost = async (reservationId) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:3000/reservation/total/${reservationId}`
+      );
+      return response.data.total;
+    } catch (error) {
+      console.error("Erreur lors du calcul du coût total :", error);
+      return 0;
+    }
+  };
 
-    // Appliquer le filtre par statut
+  // Appliquer les filtres
+  const applyFilters = () => {
+    let filtered = [...originalReservations];
+
     if (statusFilter) {
       filtered = filtered.filter(
         (reservation) => reservation.statut === statusFilter
       );
     }
 
-    // Appliquer le filtre par date de début
     if (startDateFilter) {
       filtered = filtered.filter(
         (reservation) =>
@@ -70,7 +89,6 @@ const Reservations = () => {
       );
     }
 
-    // Appliquer le filtre par date de fin
     if (endDateFilter) {
       filtered = filtered.filter(
         (reservation) =>
@@ -78,43 +96,59 @@ const Reservations = () => {
       );
     }
 
-    // Mettre à jour l'état avec les réservations filtrées
-    setFilteredReservations(filtered);
+    setReservations(filtered); // Fixer les réservations filtrées
   };
 
-  // Fonction pour annuler une réservation
+  // Annuler une réservation
   const handleCancelReservation = async (reservationId) => {
     try {
       await axios.put(
         `http://localhost:3000/reservation/cancel/${reservationId}`
       );
-
-      // Mettre à jour les réservations locales
-      const updatedReservations = reservations.map((reservation) =>
+      const updatedReservations = originalReservations.map((reservation) =>
         reservation._id === reservationId
           ? { ...reservation, statut: "annulee" }
           : reservation
       );
-
+      setOriginalReservations(updatedReservations);
       setReservations(updatedReservations);
-      applyFilters(); // Appliquer les filtres après l'annulation
-
-      alert("Réservation annulée avec succès");
+      applyFilters(); // Réappliquer les filtres
+      alert("Réservation annulée avec succès.");
     } catch (error) {
-      console.error("Erreur lors de l'annulation de la réservation", error);
-      alert("Erreur lors de l'annulation de la réservation");
+      console.error("Erreur lors de l'annulation de la réservation :", error);
+      alert("Erreur lors de l'annulation.");
+    }
+  };
+
+  // Effectuer un paiement et rediriger vers la page de paiement
+  const handlePayment = async (reservation) => {
+    try {
+      const response = await axios.post(
+        "http://localhost:3000/paiement/effectuerPaiement",
+        {
+          reservationId: reservation._id,
+          montant: reservation.total,
+          methodePaiement: "en ligne",
+        }
+      );
+
+      if (response.status === 201) {
+        window.location.replace(`/paiment?reservationId=${reservation._id}`);
+      } else {
+        alert("Erreur lors du paiement.");
+      }
+    } catch (error) {
+      console.error("Erreur lors du paiement :", error);
     }
   };
 
   return (
     <Container>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" gutterBottom sx={{ color: "orange" }}>
         Vos Réservations
       </Typography>
-
-      {/* Grid pour organiser les filtres et la liste des réservations */}
       <Grid container spacing={3}>
-        {/* Colonne de filtres */}
+        {/* Filtres */}
         <Grid item xs={12} sm={4}>
           <div
             style={{
@@ -123,7 +157,7 @@ const Reservations = () => {
               borderRadius: "8px",
             }}
           >
-            <Typography variant="h6" gutterBottom>
+            <Typography variant="h6" gutterBottom sx={{ color: "orange" }}>
               Filtres
             </Typography>
             <FormControl fullWidth>
@@ -132,64 +166,63 @@ const Reservations = () => {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 label="Statut"
+                sx={{ color: "gray" }}
               >
                 <MenuItem value="">Tous</MenuItem>
-                <MenuItem value="en cours">En Cours</MenuItem>
+                <MenuItem value="en cours">En cours</MenuItem>
                 <MenuItem value="annulee">Annulée</MenuItem>
                 <MenuItem value="terminee">Terminée</MenuItem>
+                <MenuItem value="payée">Payée</MenuItem>
               </Select>
             </FormControl>
             <TextField
-              label="Date de Début"
+              label="Date de début"
               type="date"
               fullWidth
               value={startDateFilter}
               onChange={(e) => setStartDateFilter(e.target.value)}
-              InputLabelProps={{
-                shrink: true,
-              }}
+              InputLabelProps={{ shrink: true }}
               style={{ marginTop: "10px" }}
+              sx={{ color: "gray" }}
             />
             <TextField
-              label="Date de Fin"
+              label="Date de fin"
               type="date"
               fullWidth
               value={endDateFilter}
               onChange={(e) => setEndDateFilter(e.target.value)}
-              InputLabelProps={{
-                shrink: true,
-              }}
+              InputLabelProps={{ shrink: true }}
               style={{ marginTop: "10px" }}
+              sx={{ color: "gray" }}
             />
             <Button
               variant="contained"
-              color="primary"
+              color="warning"
               onClick={applyFilters}
               style={{ marginTop: "20px" }}
             >
-              Appliquer les Filtres
+              Appliquer
             </Button>
           </div>
         </Grid>
 
-        {/* Colonne des réservations */}
+        {/* Liste des réservations */}
         <Grid item xs={12} sm={8}>
-          {/* Table des Réservations */}
           <TableContainer component={Paper}>
             <Table>
-              <TableHead>
+              <TableHead sx={{ backgroundColor: "gray" }}>
                 <TableRow>
-                  <TableCell>Véhicule</TableCell>
-                  <TableCell>Date de Début</TableCell>
-                  <TableCell>Date de Fin</TableCell>
-                  <TableCell>Coût Total</TableCell>
-                  <TableCell>Statut</TableCell>
-                  <TableCell>Action</TableCell>
+                  <TableCell sx={{ color: "orange" }}>Véhicule</TableCell>
+                  <TableCell sx={{ color: "orange" }}>Date de début</TableCell>
+                  <TableCell sx={{ color: "orange" }}>Date de fin</TableCell>
+                  <TableCell sx={{ color: "orange" }}>Coût total</TableCell>
+                  <TableCell sx={{ color: "orange" }}>Statut</TableCell>
+                  <TableCell sx={{ color: "orange" }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredReservations.length > 0 ? (
-                  filteredReservations.map((reservation) => (
+                {reservations.length > 0 ? (
+                  reservations.map((reservation) => (
                     <TableRow key={reservation._id}>
                       <TableCell>
                         {reservation.vehiculeId
@@ -204,28 +237,38 @@ const Reservations = () => {
                       </TableCell>
                       <TableCell>
                         {reservation.total
-                          ? `$${reservation.total}`
+                          ? `${reservation.total} DT`
                           : "Non calculé"}
                       </TableCell>
                       <TableCell>{reservation.statut}</TableCell>
                       <TableCell>
-                        {reservation.statut !== "annulee" && (
-                          <Button
-                            variant="contained"
-                            color="secondary"
-                            onClick={() =>
-                              handleCancelReservation(reservation._id)
-                            }
-                          >
-                            Annuler
-                          </Button>
+                        {reservation.statut === "en cours" && (
+                          <>
+                            <Button
+                              variant="outlined"
+                              color="error"
+                              onClick={() =>
+                                handleCancelReservation(reservation._id)
+                              }
+                            >
+                              Annuler
+                            </Button>
+                            <Button
+                              variant="contained"
+                              color="warning"
+                              style={{ marginLeft: "10px" }}
+                              onClick={() => handlePayment(reservation)}
+                            >
+                              Payer
+                            </Button>
+                          </>
                         )}
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} align="center">
+                    <TableCell colSpan={6}>
                       Aucune réservation trouvée.
                     </TableCell>
                   </TableRow>

@@ -21,6 +21,8 @@ import {
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import ReservationCart from "../components/Cart/ReservationCart";
+import { Carousel } from "react-responsive-carousel";
+import "react-responsive-carousel/lib/styles/carousel.min.css";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -40,7 +42,12 @@ const Home = () => {
     prixMax: 1000,
   });
   const [anchorEl, setAnchorEl] = useState(null);
-
+  const carouselImages = [
+    "https://res.cloudinary.com/dmyv5xkhy/image/upload/v1732477229/RentCar/ytqnktguzgmdw6iovnrx.jpg",
+    "https://res.cloudinary.com/dmyv5xkhy/image/upload/v1732477222/RentCar/rwj6pfbujbwvemrrubbn.webp",
+    "https://res.cloudinary.com/dmyv5xkhy/image/upload/v1732477216/RentCar/ymxcxahtbzftklhkzt6i.jpg",
+    "https://res.cloudinary.com/dmyv5xkhy/image/upload/v1732477210/RentCar/af3j0snjeiitxqmqgl4z.jpg",
+  ];
   useEffect(() => {
     const fetchVehicles = async () => {
       try {
@@ -111,61 +118,66 @@ const Home = () => {
     }
   };
 
-  const filterVehiclesByDate = async () => {
+  const filterVehicles = async () => {
     const { dateDebut, dateFin, marque, modele, prixMin, prixMax } =
       reservationData;
-    if (dateDebut && dateFin) {
-      try {
-        const response = await axios.post(
-          "http://localhost:3000/reservation/available",
-          {
-            dateDebut,
-            dateFin,
-            marque,
-            modele,
-            prixMin,
-            prixMax,
-          }
-        );
-        setFilteredVehicles(response.data); // Set filtered vehicles based on the selected filters
-      } catch (error) {
-        console.error("Error filtering vehicles:", error);
-        alert("Error filtering vehicles. Please try again.");
-      }
-    } else {
-      alert("Please select both start and end dates.");
+
+    try {
+      // Fetch vehicles based on date
+      const dateFilteredVehicles =
+        dateDebut && dateFin
+          ? await axios
+              .post("http://localhost:3000/reservation/available", {
+                dateDebut,
+                dateFin,
+              })
+              .then((res) => res.data)
+          : vehicles;
+
+      // Further filter by marque, modele, and price
+      const filtered = dateFilteredVehicles.filter(
+        (vehicle) =>
+          (!marque || vehicle.marque === marque) &&
+          (!modele || vehicle.modele === modele) &&
+          vehicle.prixJournalier >= prixMin &&
+          vehicle.prixJournalier <= prixMax
+      );
+
+      setFilteredVehicles(filtered);
+    } catch (error) {
+      console.error("Error filtering vehicles:", error);
+      alert("Error filtering vehicles. Please try again.");
     }
   };
 
   return (
     <Container>
-      <Box
-        sx={{ display: "flex", justifyContent: "space-between", mt: 3, mb: 2 }}
-      >
-        <Typography variant="h4">
-          Welcome, {client ? client.nom : "Guest"}
-        </Typography>
-        <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
-          <MenuIcon />
-        </IconButton>
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={() => setAnchorEl(null)}
-        >
-          <MenuItem onClick={handleLogout}>Logout</MenuItem>
-          <MenuItem onClick={() => navigate("/reservations")}>
-            My Reservations
-          </MenuItem>{" "}
-          {/* New menu item */}
-        </Menu>
+      {/* Carousel Section */}
+      <Box sx={{ mb: 4 }}>
+        <Carousel showThumbs={false} autoPlay infiniteLoop>
+          {carouselImages.map((image, index) => (
+            <div key={index}>
+              <img
+                src={image}
+                alt={`Carousel ${index + 1}`}
+                style={{
+                  height: "400px",
+                  objectFit: "cover",
+                  border: "2px solid orange",
+                }}
+              />
+            </div>
+          ))}
+        </Carousel>
       </Box>
-
       <Grid container spacing={2}>
         {/* Left Column: Filter Section */}
         <Grid item xs={12} sm={3}>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <Typography variant="body2" sx={{ fontSize: "0.85rem", mb: 1 }}>
+            <Typography
+              variant="body2"
+              sx={{ fontSize: "1rem", color: "gray", fontWeight: "bold" }}
+            >
               Filter Vehicles
             </Typography>
 
@@ -226,7 +238,10 @@ const Home = () => {
             </FormControl>
 
             {/* Price Range Filter */}
-            <Typography variant="body2" sx={{ fontSize: "0.85rem" }}>
+            <Typography
+              variant="body2"
+              sx={{ fontSize: "1rem", color: "gray", mt: 1 }}
+            >
               Price Range
             </Typography>
             <Slider
@@ -249,9 +264,14 @@ const Home = () => {
             {/* Filter Button */}
             <Button
               variant="contained"
-              onClick={filterVehiclesByDate}
+              onClick={filterVehicles}
               size="small"
-              sx={{ mt: 1, fontSize: "0.8rem", padding: "5px 15px" }}
+              sx={{
+                mt: 1,
+                fontSize: "0.8rem",
+                backgroundColor: "orange",
+                "&:hover": { backgroundColor: "darkorange" },
+              }}
             >
               Filter
             </Button>
@@ -260,15 +280,20 @@ const Home = () => {
 
         {/* Right Column: Vehicle Cards Section */}
         <Grid item xs={12} sm={9}>
-          <Card sx={{ p: 2 }}>
-            <Typography variant="h5" sx={{ mb: 2 }}>
+          <Card sx={{ p: 2, backgroundColor: "#f8f8f8" }}>
+            <Typography variant="h5" sx={{ mb: 2, color: "orange" }}>
               Vehicles Available for Reservation
             </Typography>
             <Grid container spacing={2}>
               {(filteredVehicles.length ? filteredVehicles : vehicles).map(
                 (vehicle) => (
                   <Grid item xs={12} sm={6} md={4} key={vehicle._id}>
-                    <Card>
+                    <Card
+                      sx={{
+                        backgroundColor: "white",
+                        border: "1px solid gray",
+                      }}
+                    >
                       <CardContent>
                         {vehicle.images.length > 0 && (
                           <img
@@ -278,13 +303,17 @@ const Home = () => {
                               width: "100%",
                               height: "200px",
                               objectFit: "cover",
+                              borderBottom: "2px solid orange",
                             }}
                           />
                         )}
-                        <Typography variant="h6" sx={{ mt: 2 }}>
+                        <Typography
+                          variant="h6"
+                          sx={{ mt: 2, color: "orange" }}
+                        >
                           {vehicle.marque} {vehicle.modele}
                         </Typography>
-                        <Typography>
+                        <Typography sx={{ color: "gray" }}>
                           Price per day: {vehicle.prixJournalier} dt
                         </Typography>
                       </CardContent>
@@ -294,6 +323,12 @@ const Home = () => {
                           color="primary"
                           onClick={() => openReservationModal(vehicle)}
                           size="small"
+                          sx={{
+                            backgroundColor: "orange",
+                            "&:hover": {
+                              backgroundColor: "darkorange",
+                            },
+                          }}
                         >
                           Reserve
                         </Button>

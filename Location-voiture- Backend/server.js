@@ -7,6 +7,7 @@ const reservationRouter = require("./routes/reservationRoutes");
 const VehiculeRouter = require("./routes/vehiculeRoutes");
 const paiementRouter = require("./routes/paiementRoutes");
 const gestionnaireRoutes = require("./routes/gestionnaireRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 const app = express();
 const Server = http.createServer(app);
@@ -29,6 +30,7 @@ app.use("/reservation", reservationRouter);
 app.use("/vehicule", VehiculeRouter);
 app.use("/paiement", paiementRouter);
 app.use("/gestionnaire", gestionnaireRoutes);
+app.use("/notifications", notificationRoutes);
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
