@@ -14,6 +14,7 @@ import {
   DialogContent,
   DialogTitle,
   TextField,
+  CircularProgress,
 } from "@mui/material";
 import AddVehicule from "../../components/Cart/AddVehicule"; // Importer le composant AddVehicule
 import { format, isValid } from "date-fns"; // Assurez-vous que 'date-fns' est installé
@@ -32,7 +33,8 @@ const HomeAdmin = () => {
   const [openPaymentsDialog, setOpenPaymentsDialog] = useState(false); // État pour gérer l'ouverture du dialog des paiements
   const [notificationMessage, setNotificationMessage] = useState("");
   const [currentNotification, setCurrentNotification] = useState(""); // Message de notification actuel
-
+  const [loading, setLoading] = useState(true);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
   // Notifications
   const [notifications, setNotifications] = useState([]); // Stocker les notifications
   const [notificationOpen, setNotificationOpen] = useState(false); // État pour ouvrir/fermer le dialog des notifications
@@ -41,10 +43,29 @@ const HomeAdmin = () => {
     fetchVehicles();
     fetchNotifications(); // Appeler la fonction pour récupérer les notifications
   }, []);
-
+  useEffect(() => {
+    if (notifications.length > 0 && !snackbarOpen) {
+      showNextNotification();
+    }
+  }, [notifications, snackbarOpen]);
   useEffect(() => {
     console.log("Paiements reçus :", payments);
   }, [payments]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        await fetchVehicles();
+        await fetchNotifications(); // Wait for both data fetching to finish
+        setLoading(false); // Set loading to false once data is fetched
+      } catch (error) {
+        console.error("Erreur lors du chargement des données:", error);
+        setLoading(false); // In case of error, set loading to false
+      }
+    };
+
+    fetchData();
+  }, []); // Empty dependency array ensures this runs once when the component mounts
 
   const handleNotificationClose = () => {
     setNotificationOpen(false); // Close the notification Snackbar
@@ -58,23 +79,27 @@ const HomeAdmin = () => {
       console.error("Erreur lors de la récupération des véhicules:", error);
     }
   };
-  const markNotificationAsRead = async (id) => {
-    try {
-      await axios.put(`http://localhost:3000/notifications/${id}/markAsRead`);
-      setNotifications(notifications.filter((notif) => notif._id !== id)); // Retirez la notification de l'état local
-      setNotificationMessage("Notification marquée comme lue.");
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour de la notification:", error);
-    }
-  };
 
   const fetchNotifications = async () => {
     try {
-      const response = await axios.get("http://localhost:3000/notifications"); // Remplacez par votre endpoint
+      const response = await axios.get("http://localhost:3000/notifications");
       setNotifications(response.data);
     } catch (error) {
       console.error("Erreur lors de la récupération des notifications:", error);
     }
+  };
+
+  const showNextNotification = () => {
+    if (notifications.length > 0) {
+      const nextNotification = notifications[0];
+      setCurrentNotification(nextNotification);
+      setSnackbarOpen(true);
+    }
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbarOpen(false);
+    setNotifications((prev) => prev.slice(1)); // Retirer la notification affichée
   };
 
   const handleAddVehiculeClick = () => {
@@ -162,12 +187,26 @@ const HomeAdmin = () => {
 
   // Gérer l'ouverture/fermeture du dialog des notifications
   const handleNotificationClick = () => {
-    setNotificationOpen(true);
+    setNotificationOpen(true); // No need for parameters
   };
 
   const handleCloseNotifications = () => {
     setNotificationOpen(false);
   };
+  if (loading) {
+    return (
+      <Container
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
+        <CircularProgress sx={{ color: "orange" }} />
+      </Container>
+    );
+  }
 
   return (
     <Container>
@@ -297,23 +336,23 @@ const HomeAdmin = () => {
         <NotificationsIcon sx={{ fontSize: 30, color: "orange" }} />
       </Badge>
 
-      
-
-      {/* Snackbar pour afficher une notification */}
-      <Snackbar
-        open={notificationOpen}
-        autoHideDuration={6000} // Délai avant de fermer automatiquement
-        onClose={handleNotificationClose}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }} // Position
-      >
-        <Alert
-          onClose={handleNotificationClose}
-          severity="info"
-          sx={{ width: "100%" }}
+      {/* Snackbar pour les notifications */}
+      {currentNotification && (
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={5000}
+          onClose={handleSnackbarClose}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
         >
-          {currentNotification || "Nouvelle notification reçue"}
-        </Alert>
-      </Snackbar>
+          <Alert
+            onClose={handleSnackbarClose}
+            severity={currentNotification.type || "info"}
+            sx={{ width: "100%" }}
+          >
+            {currentNotification.message}
+          </Alert>
+        </Snackbar>
+      )}
       {/* Dialog de confirmation de suppression */}
       <Dialog
         open={openDeleteDialog}

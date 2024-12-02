@@ -1,6 +1,5 @@
-// src/pages/Login.jsx
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import {
   TextField,
@@ -9,7 +8,10 @@ import {
   Box,
   Container,
   Alert,
+  Avatar,
+  CssBaseline,
 } from "@mui/material";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -36,53 +38,97 @@ const Login = () => {
   };
 
   return (
-    <Container maxWidth="xs">
+    <Container component="main" maxWidth="xs">
+      <CssBaseline />
       <Box
         sx={{
-          mt: 8,
+          marginTop: 8,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
         }}
       >
-        <Typography component="h1" variant="h5">
-          Login
+        {/* Logo */}
+        <Avatar sx={{ m: 1, bgcolor: "orange" }}>
+          <LockOutlinedIcon />
+        </Avatar>
+        <Typography component="h1" variant="h5" color="text.primary">
+          Connexion
         </Typography>
+        {/* Login Form */}
         <Box component="form" onSubmit={handleLogin} noValidate sx={{ mt: 1 }}>
           <TextField
             margin="normal"
             required
             fullWidth
             id="email"
-            label="Email"
+            label="Adresse Email"
             name="email"
             autoComplete="email"
             autoFocus
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            InputLabelProps={{
+              style: { color: "orange" },
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                "&.Mui-focused fieldset": {
+                  borderColor: "orange",
+                },
+              },
+            }}
           />
           <TextField
             margin="normal"
             required
             fullWidth
             name="password"
-            label="Mot de passe"
+            label="Mot de Passe"
             type="password"
             id="password"
             autoComplete="current-password"
             value={motDePasse}
             onChange={(e) => setMotDePasse(e.target.value)}
+            InputLabelProps={{
+              style: { color: "orange" },
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                "&.Mui-focused fieldset": {
+                  borderColor: "orange",
+                },
+              },
+            }}
           />
           {error && <Alert severity="error">{error}</Alert>}
           <Button
             type="submit"
             fullWidth
             variant="contained"
-            color="primary"
-            sx={{ mt: 3, mb: 2 }}
+            sx={{
+              mt: 3,
+              mb: 2,
+              bgcolor: "orange",
+              "&:hover": { bgcolor: "darkorange" },
+            }}
           >
-            Login
+            Se Connecter
           </Button>
+          {/* Signup Link */}
+          <Typography variant="body2" align="center" sx={{ mt: 2 }}>
+            Pas encore de compte ?{" "}
+            <Link
+              to="/signup"
+              style={{
+                textDecoration: "none",
+                color: "orange",
+                fontWeight: "bold",
+              }}
+            >
+              Inscrivez-vous ici
+            </Link>
+          </Typography>
         </Box>
       </Box>
     </Container>

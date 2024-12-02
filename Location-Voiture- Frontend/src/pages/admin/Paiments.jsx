@@ -1,232 +1,300 @@
-import React, { useState } from "react";
-import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
+import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
+import CreditCard from "react-credit-cards";
+import "react-credit-cards/es/styles-compiled.css";
+import {
+  TextField,
+  Button,
+  Typography,
+  Box,
+  CircularProgress,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  FormControl,
+} from "@mui/material";
 
-const Paiments = () => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [paymentSuccessful, setPaymentSuccessful] = useState(false);
-
-  // Champs d'informations supplémentaires
+const Paiement = () => {
+  const location = useLocation();
+  const { reservationId } = location.state || {};
+  const [total, setTotal] = useState(0);
+  const [cardNumber, setCardNumber] = useState("");
   const [cardholderName, setCardholderName] = useState("");
   const [billingAddress, setBillingAddress] = useState("");
   const [billingCity, setBillingCity] = useState("");
   const [billingPostalCode, setBillingPostalCode] = useState("");
+  const [cvc, setCvc] = useState("");
+  const [expMonth, setExpMonth] = useState("");
+  const [expYear, setExpYear] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const fetchTotalCost = async (reservationId) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:3000/reservation/total/${reservationId}`
+      );
+      setTotal(response.data.total);
+    } catch (error) {
+      setTotal(0);
+    }
+  };
+
+  useEffect(() => {
+    if (reservationId) {
+      fetchTotalCost(reservationId);
+    }
+  }, [reservationId]);
+
+  const validateCardNumber = (number) => {
+    return /^\d{16}$/.test(number); // Ensures 16 digits
+  };
+
+  const validateCvc = (cvc) => {
+    return /^\d{3}$/.test(cvc); // Ensures 3 digits
+  };
+
+  const validateExpDate = (month, year) => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear() % 100; // Get the last two digits of the year
+    const currentMonth = currentDate.getMonth() + 1;
+    if (month < 1 || month > 12) return false; // Invalid month
+    if (year < currentYear || (year === currentYear && month < currentMonth)) {
+      return false; // Expired date
+    }
+    return true;
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-
-    if (!stripe || !elements) {
-      setMessage("Stripe.js n'est pas encore chargé. Veuillez réessayer.");
-      return;
-    }
-
-    // Validation des champs d'informations
-    if (
-      !cardholderName ||
-      !billingAddress ||
-      !billingCity ||
-      !billingPostalCode
-    ) {
-      setMessage("Veuillez remplir tous les champs d'information.");
-      return;
-    }
-
     setLoading(true);
     setMessage("");
 
-    try {
-      // Récupérer les détails de la carte de crédit
-      const cardElement = elements.getElement(CardElement);
-
-      if (!cardElement) {
-        setMessage("Carte de crédit non valide.");
+    // Validate inputs
+    if (paymentMethod === "carte") {
+      if (!validateCardNumber(cardNumber)) {
+        setMessage("Le numéro de carte doit comporter 16 chiffres.");
         setLoading(false);
         return;
       }
-
-      // Créer un PaymentMethod avec Stripe
-      const { error, paymentMethod } = await stripe.createPaymentMethod({
-        type: "card",
-        card: cardElement,
-        billing_details: {
-          name: cardholderName,
-          address: {
-            line1: billingAddress,
-            city: billingCity,
-            postal_code: billingPostalCode,
-          },
-        },
-      });
-
-      if (error) {
-        setMessage(`Erreur lors de la création du paiement : ${error.message}`);
+      if (!validateCvc(cvc)) {
+        setMessage("Le CVC doit comporter 3 chiffres.");
         setLoading(false);
         return;
       }
-
-      // Simuler une demande à votre backend pour traiter le paiement
-      const response = await axios.post("http://localhost:3000/payment", {
-        paymentMethodId: paymentMethod.id,
-        amount: 5000, // Exemple : Montant en centimes (50.00 DT)
-      });
-
-      if (response.data.success) {
-        setMessage("Paiement réussi !");
-        setPaymentSuccessful(true);
-      } else {
-        setMessage("Le paiement a échoué. Veuillez réessayer.");
+      if (!validateExpDate(expMonth, expYear)) {
+        setMessage("La date d'expiration est invalide.");
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      setMessage("Une erreur est survenue lors du paiement.");
-      console.error(error);
     }
 
-    setLoading(false);
+    const paiementData = {
+      reservationId: reservationId,
+      montant: total,
+      methodePaiement: paymentMethod === "carte" ? "Carte" : "Cash",
+      ...(paymentMethod === "carte" && {
+        cardNumber,
+        cardholderName,
+        billingAddress,
+        billingCity,
+        billingPostalCode,
+        cvc,
+        expMonth,
+        expYear,
+      }),
+    };
+
+    try {
+      const response = await axios.post(
+        "http://localhost:3000/paiement/effectuerPaiement",
+        paiementData
+      );
+      setMessage("Paiement effectué avec succès !");
+      setLoading(false);
+      navigate("/reservations");
+    } catch (error) {
+      setMessage("Erreur lors du paiement. Veuillez réessayer.");
+      setLoading(false);
+    }
   };
 
   return (
-    <div
-      style={{
-        maxWidth: "400px",
+    <Box
+      sx={{
+        maxWidth: 400,
         margin: "50px auto",
         textAlign: "center",
-        padding: "20px",
+        padding: 3,
         border: "1px solid #ddd",
-        borderRadius: "8px",
+        borderRadius: 2,
         backgroundColor: "#f9f9f9",
       }}
     >
-      <h2 style={{ color: "#333", marginBottom: "20px" }}>Paiement</h2>
+      <Typography variant="h5" sx={{ color: "#333", marginBottom: 2 }}>
+        Paiement
+      </Typography>
 
-      {!paymentSuccessful ? (
-        <form onSubmit={handleSubmit}>
-          {/* Nom du titulaire de la carte */}
-          <div style={{ marginBottom: "15px" }}>
-            <input
-              type="text"
-              placeholder="Nom du titulaire de la carte"
-              value={cardholderName}
-              onChange={(e) => setCardholderName(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px",
-                fontSize: "16px",
-                borderRadius: "4px",
-                border: "1px solid #ddd",
-              }}
-              required
-            />
-          </div>
+      <Typography variant="h6" sx={{ marginBottom: 2, color: "green" }}>
+        Montant à payer : {total > 0 ? `${total} DT` : "Calcul en cours..."}
+      </Typography>
 
-          {/* Adresse de facturation */}
-          <div style={{ marginBottom: "15px" }}>
-            <input
-              type="text"
-              placeholder="Adresse de facturation"
-              value={billingAddress}
-              onChange={(e) => setBillingAddress(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px",
-                fontSize: "16px",
-                borderRadius: "4px",
-                border: "1px solid #ddd",
-              }}
-              required
-            />
-          </div>
-
-          {/* Ville */}
-          <div style={{ marginBottom: "15px" }}>
-            <input
-              type="text"
-              placeholder="Ville"
-              value={billingCity}
-              onChange={(e) => setBillingCity(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px",
-                fontSize: "16px",
-                borderRadius: "4px",
-                border: "1px solid #ddd",
-              }}
-              required
-            />
-          </div>
-
-          {/* Code postal */}
-          <div style={{ marginBottom: "15px" }}>
-            <input
-              type="text"
-              placeholder="Code postal"
-              value={billingPostalCode}
-              onChange={(e) => setBillingPostalCode(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px",
-                fontSize: "16px",
-                borderRadius: "4px",
-                border: "1px solid #ddd",
-              }}
-              required
-            />
-          </div>
-
-          {/* Carte de crédit */}
-          <CardElement
-            options={{
-              style: {
-                base: {
-                  fontSize: "16px",
-                  color: "#424770",
-                  "::placeholder": {
-                    color: "#aab7c4",
-                  },
-                },
-                invalid: {
-                  color: "#9e2146",
-                },
-              },
-            }}
-          />
-          <button
-            type="submit"
-            disabled={!stripe || loading}
-            style={{
-              marginTop: "20px",
-              padding: "10px 20px",
-              backgroundColor: "#6772e5",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-              fontSize: "16px",
-            }}
-          >
-            {loading ? "Traitement..." : "Payer"}
-          </button>
-        </form>
-      ) : (
-        <div>
-          <h3 style={{ color: "green" }}>Merci pour votre paiement !</h3>
-        </div>
-      )}
-
-      {message && (
-        <p
-          style={{
-            marginTop: "20px",
-            color: paymentSuccessful ? "green" : "red",
-          }}
+      <FormControl component="fieldset" sx={{ marginBottom: 2 }}>
+        <RadioGroup
+          row
+          value={paymentMethod}
+          onChange={(e) => setPaymentMethod(e.target.value)}
         >
-          {message}
-        </p>
+          <FormControlLabel value="carte" control={<Radio />} label="Carte" />
+          <FormControlLabel value="cash" control={<Radio />} label="Cash" />
+        </RadioGroup>
+      </FormControl>
+
+      {paymentMethod === "carte" && (
+        <form onSubmit={handleSubmit}>
+          <Box sx={{ marginBottom: 2 }}>
+            <CreditCard
+              number={cardNumber}
+              name={cardholderName}
+              expiry={`${expMonth}/${expYear}`}
+              focused="number"
+            />
+          </Box>
+
+          <TextField
+            label="Nom du titulaire"
+            variant="outlined"
+            fullWidth
+            value={cardholderName}
+            onChange={(e) => setCardholderName(e.target.value)}
+            sx={{ marginBottom: 2 }}
+            required
+          />
+
+          <TextField
+            label="Numéro de la carte"
+            variant="outlined"
+            fullWidth
+            value={cardNumber}
+            onChange={(e) => {
+              if (e.target.value.length <= 16) {
+                setCardNumber(e.target.value);
+              }
+            }}
+            sx={{ marginBottom: 2 }}
+            required
+          />
+
+          <TextField
+            label="CVC"
+            variant="outlined"
+            fullWidth
+            value={cvc}
+            onChange={(e) => {
+              if (e.target.value.length <= 3) {
+                setCvc(e.target.value);
+              }
+            }}
+            sx={{ marginBottom: 2 }}
+            required
+          />
+
+          <Box sx={{ marginBottom: 2, display: "flex", gap: 2 }}>
+            <TextField
+              label="MM"
+              variant="outlined"
+              value={expMonth}
+              onChange={(e) => {
+                if (e.target.value.length <= 3) {
+                  setExpMonth(e.target.value);
+                }
+              }}
+              sx={{ flex: 1 }}
+              required
+            />
+            <TextField
+              label="YY"
+              variant="outlined"
+              value={expYear}
+              onChange={(e) => {
+                if (e.target.value.length <= 2) {
+                  setExpYear(e.target.value);
+                }
+              }}
+              sx={{ flex: 1 }}
+              required
+            />
+          </Box>
+
+          <TextField
+            label="Adresse de facturation"
+            variant="outlined"
+            fullWidth
+            value={billingAddress}
+            onChange={(e) => setBillingAddress(e.target.value)}
+            sx={{ marginBottom: 2 }}
+            required
+          />
+
+          <TextField
+            label="Ville"
+            variant="outlined"
+            fullWidth
+            value={billingCity}
+            onChange={(e) => setBillingCity(e.target.value)}
+            sx={{ marginBottom: 2 }}
+            required
+          />
+
+          <TextField
+            label="Code postal"
+            variant="outlined"
+            fullWidth
+            value={billingPostalCode}
+            onChange={(e) => setBillingPostalCode(e.target.value)}
+            sx={{ marginBottom: 2 }}
+            required
+          />
+
+          {message && (
+            <Typography
+              sx={{
+                marginTop: 2,
+                color: message.includes("succès") ? "green" : "red",
+              }}
+            >
+              {message}
+            </Typography>
+          )}
+
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            disabled={loading}
+            sx={{ marginTop: 2 }}
+          >
+            {loading ? <CircularProgress size={24} /> : "Payer"}
+          </Button>
+        </form>
       )}
-    </div>
+
+      {paymentMethod === "cash" && (
+        <Button
+          onClick={handleSubmit}
+          variant="contained"
+          fullWidth
+          disabled={loading}
+          sx={{ marginTop: 2 }}
+        >
+          {loading ? <CircularProgress size={24} /> : "Payer en Cash"}
+        </Button>
+      )}
+    </Box>
   );
 };
 
-export default Paiments;
+export default Paiement;

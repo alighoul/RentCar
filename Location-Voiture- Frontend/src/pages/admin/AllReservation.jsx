@@ -25,7 +25,7 @@ const AllReservations = () => {
     try {
       const response = await axios.get("http://localhost:3000/reservation/all");
       const sortedReservations = response.data.sort(
-        (a, b) => new Date(a.dateDebut) - new Date(b.dateDebut)
+        (a, b) => new Date(b.dateDebut) - new Date(a.dateDebut)
       );
 
       setReservations(sortedReservations);
@@ -144,19 +144,22 @@ const AllReservations = () => {
                 </TableCell>
                 <TableCell>{reservation.statut}</TableCell>
                 <TableCell>
-                  <Button
-                    variant="contained"
-                    sx={{
-                      backgroundColor: "#e42d0d",
-                      color: "white",
-                      "&:hover": {
-                        backgroundColor: "darkorange",
-                      },
-                    }}
-                    onClick={() => handleGenerateContract(reservation)}
-                  >
-                    Générer Contrat
-                  </Button>
+                  {/* Afficher le bouton uniquement si le statut est "Payée" */}
+                  {reservation.statut === "payée" && (
+                    <Button
+                      variant="contained"
+                      sx={{
+                        backgroundColor: "#e42d0d",
+                        color: "white",
+                        "&:hover": {
+                          backgroundColor: "darkorange",
+                        },
+                      }}
+                      onClick={() => handleGenerateContract(reservation)}
+                    >
+                      Générer Contrat
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

@@ -23,6 +23,39 @@ router.post("/add", async (req, res) => {
     });
   }
 });
+// Route pour mettre à jour le statut d'une réservation en "payée"
+router.put("/updateStatus/payee/:id", async (req, res) => {
+  try {
+    // Rechercher la réservation par ID
+    const reservation = await Reservation.findById(req.params.id);
+
+    if (!reservation) {
+      return res.status(404).json({ message: "Réservation non trouvée" });
+    }
+
+    // Vérifier si la réservation est déjà payée
+    if (reservation.statut === "payée") {
+      return res.status(400).json({ message: "La réservation est déjà payée" });
+    }
+
+    // Mettre à jour le statut en "payée"
+    reservation.statut = "payée";
+
+    // Sauvegarder les modifications dans la base de données
+    await reservation.save();
+
+    // Répondre avec succès et inclure la réservation mise à jour
+    res.status(200).json({
+      message: "Le statut de la réservation a été mis à jour en 'payée'",
+      reservation,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Erreur lors de la mise à jour du statut en 'payée'",
+      error: error.message,
+    });
+  }
+});
 
 // Route pour annuler une réservation
 router.put("/cancel/:id", async (req, res) => {
@@ -70,6 +103,28 @@ router.get("/total/:id", async (req, res) => {
     });
   }
 });
+
+router.get("/filter", async (req, res) => {
+  try {
+    const { status, startDate, endDate, clientId } = req.query;
+
+    // Créer un filtre dynamique
+    const filter = { clientId };
+
+    if (status) filter.statut = status;
+    if (startDate) filter.dateDebut = { $gte: new Date(startDate) };
+    if (endDate)
+      filter.dateFin = { ...filter.dateFin, $lte: new Date(endDate) };
+
+    const reservations = await Reservation.find(filter).populate("vehiculeId");
+    res.json(reservations);
+  } catch (error) {
+    console.error("Erreur lors du filtrage des réservations:", error);
+    res.status(500).json({ error: "Erreur lors du filtrage des réservations" });
+  }
+});
+
+module.exports = router;
 
 // Route pour récupérer une réservation spécifique
 router.get("/getReservation/:id", async (req, res) => {

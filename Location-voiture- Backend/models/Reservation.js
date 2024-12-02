@@ -15,7 +15,7 @@ const ReservationSchema = new mongoose.Schema({
   dateFin: { type: Date, required: true },
   statut: {
     type: String,
-    enum: ["en cours", "annulee", "terminee"],
+    enum: ["en cours", "annulee", "terminee", "payée"],
     default: "en cours",
   },
 });

@@ -6,45 +6,44 @@ const stripe = require("stripe")("your_stripe_secret_key");
 const paypal = require("@paypal/checkout-server-sdk");
 
 // Route pour effectuer un paiement via Stripe
-router.post("/stripe", async (req, res) => {
-  const { montant, token, reservationId } = req.body; // token est récupéré du frontend via Stripe.js
+router.post("/paiementStripe", async (req, res) => {
+  const { reservationId, montant, token } = req.body;
 
   try {
-    // Crée une charge Stripe
-    const charge = await stripe.charges.create({
-      amount: montant * 100, // Stripe utilise des cents
-      currency: "usd",
-      description: "Paiement de réservation",
-      source: token, // Le token obtenu du frontend
-    });
-
-    // Vérifie que la réservation existe
+    // Vérifie si la réservation existe
     const reservation = await Reservation.findById(reservationId);
     if (!reservation) {
       return res.status(404).json({ message: "Réservation non trouvée" });
     }
 
-    // Enregistrer le paiement
+    // Effectue le paiement via Stripe
+    const charge = await stripe.charges.create({
+      amount: montant * 100, // Montant en centimes
+      currency: "usd", // Devise
+      description: `Paiement pour la réservation ${reservationId}`,
+      source: token,
+    });
+
+    // Enregistre le paiement dans MongoDB
     const paiement = new Paiement({
       reservationId,
       montant,
       methodePaiement: "Stripe",
     });
-    const savedPaiement = await paiement.save();
+    await paiement.save();
 
-    // Mettre à jour la réservation pour marquer comme payée
-    reservation.statut = "payée"; // Met à jour le statut
+    // Met à jour le statut de la réservation
+    reservation.statut = "payée";
     await reservation.save();
 
-    res.status(200).json({
+    res.status(201).json({
       message: "Paiement effectué avec succès",
+      paiement,
       charge,
-      paiement: savedPaiement,
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Erreur lors du paiement", error: error.message });
+    console.error("Erreur lors du paiement Stripe:", error.message);
+    res.status(500).json({ message: "Erreur lors du paiement", error });
   }
 });
 
@@ -130,26 +129,14 @@ router.post("/execute", async (req, res) => {
   }
 });
 
-// Route pour enregistrer un paiement
 router.post("/effectuerPaiement", async (req, res) => {
-  const { reservationId, montant, methodePaiement, token } = req.body;
+  const { reservationId, montant, methodePaiement } = req.body;
 
   try {
     // Vérifie que la réservation existe
     const reservation = await Reservation.findById(reservationId);
     if (!reservation) {
       return res.status(404).json({ message: "Réservation non trouvée" });
-    }
-
-    // Effectuer le paiement via Stripe si une méthode est sélectionnée
-    let charge;
-    if (methodePaiement === "Stripe" && token) {
-      charge = await stripe.charges.create({
-        amount: montant * 100, // Stripe utilise des centimes
-        currency: "usd", // Devise en USD
-        description: "Paiement de réservation",
-        source: token, // Le token Stripe passé depuis le frontend
-      });
     }
 
     // Crée et enregistre le paiement dans la base de données
@@ -167,7 +154,6 @@ router.post("/effectuerPaiement", async (req, res) => {
     res.status(201).json({
       message: "Paiement enregistré avec succès",
       paiement: savedPaiement,
-      charge,
     });
   } catch (error) {
     res.status(500).json({
@@ -176,6 +162,7 @@ router.post("/effectuerPaiement", async (req, res) => {
     });
   }
 });
+
 // Route pour supprimer tous les paiements
 router.delete("/supprimerTousLesPaiements", async (req, res) => {
   try {
