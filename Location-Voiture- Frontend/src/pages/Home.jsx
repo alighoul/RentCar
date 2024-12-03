@@ -92,6 +92,26 @@ const Home = () => {
   };
 
   const confirmReservation = async () => {
+    if (!reservationData.dateDebut || !reservationData.dateFin) {
+      alert("Veuillez sélectionner une date de début et de fin.");
+      return;
+    }
+
+    const today = new Date();
+    const startDate = new Date(reservationData.dateDebut);
+    const endDate = new Date(reservationData.dateFin);
+
+    // Validation de la date
+    if (startDate < today || endDate < today) {
+      alert("Les dates ne peuvent pas être dans le passé.");
+      return;
+    }
+
+    if (startDate > endDate) {
+      alert("La date de début doit être avant la date de fin.");
+      return;
+    }
+
     if (client && selectedVehicle) {
       try {
         await axios.post("http://localhost:3000/reservation/add", {
@@ -101,19 +121,19 @@ const Home = () => {
           dateFin: reservationData.dateFin,
         });
 
-        alert("Reservation successful!");
+        alert("Réservation réussie !");
         closeReservationModal();
       } catch (error) {
-        console.error("Error making reservation:", error);
+        console.error("Erreur lors de la réservation :", error);
 
         if (error.response && error.response.data.message) {
           alert(error.response.data.message);
         } else {
-          alert("Failed to reserve vehicle. Please try again.");
+          alert("Échec de la réservation. Veuillez réessayer.");
         }
       }
     } else {
-      alert("Please log in to make a reservation.");
+      alert("Veuillez vous connecter pour réserver un véhicule.");
       navigate("/login");
     }
   };
